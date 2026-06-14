@@ -40,6 +40,21 @@ class RateRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findActivePair(string $currencyFrom, string $currencyTo): ?Rate
+    {
+        return $this->createQueryBuilder('r')
+            ->andWhere('r.currencyFrom = :from')
+            ->andWhere('r.currencyTo = :to')
+            ->andWhere('r.status = :status')
+            ->setParameter('from', $currencyFrom)
+            ->setParameter('to', $currencyTo)
+            ->setParameter('status', Status::Active->value)
+            ->orderBy('r.updatedAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     /**
      * @return Rate[]
      */

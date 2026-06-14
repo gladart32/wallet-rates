@@ -47,6 +47,9 @@
             "migrations/.gitignore"
         ]
     },
+    "nelmio/api-doc-bundle": {
+        "version": "v5.10.3"
+    },
     "phpunit/phpunit": {
         "version": "13.2",
         "recipe": {
@@ -153,6 +156,19 @@
             "config/routes.yaml"
         ]
     },
+    "symfony/twig-bundle": {
+        "version": "8.1",
+        "recipe": {
+            "repo": "github.com/symfony/recipes",
+            "branch": "main",
+            "version": "6.4",
+            "ref": "f250159ebe99153d0c640a3e7742876fc7453f2c"
+        },
+        "files": [
+            "config/packages/twig.yaml",
+            "templates/base.html.twig"
+        ]
+    },
     "symfony/validator": {
         "version": "8.1",
         "recipe": {
@@ -164,5 +180,8 @@
         "files": [
             "config/packages/validator.yaml"
         ]
+    },
+    "twig/extra-bundle": {
+        "version": "v3.24.0"
     }
 }

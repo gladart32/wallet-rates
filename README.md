@@ -84,10 +84,185 @@ docker compose exec php bin/console doctrine:fixtures:load -n
 > docker compose exec php bin/console doctrine:fixtures:load -n --append
 > ```
 
-**Запустить тесты**
+## Тестирование
+
+### 1. Подготовка тестового окружения (один раз после клонирования)
+
+Пользователь `user` в `docker-compose.yml` не имеет права `CREATE DATABASE`, поэтому тестовую БД нужно создать вручную через `root`:
+
+```bash
+docker compose exec mysql mysql -uroot -proot \
+  -e 'CREATE DATABASE IF NOT EXISTS `wallet-rates_test`; \
+      GRANT ALL PRIVILEGES ON `wallet-rates_test`.* TO "user"@"%"; \
+      FLUSH PRIVILEGES;'
+```
+
+Затем — миграции и фикстуры для тестового окружения:
+
+```bash
+docker compose exec php bin/console --env=test doctrine:migrations:migrate -n
+docker compose exec php bin/console --env=test doctrine:fixtures:load -n
+```
+
+### 2. Запуск всех тестов
+
 ```bash
 docker compose exec php vendor/bin/phpunit
 ```
+
+### 3. Запуск конкретного файла
+
+```bash
+docker compose exec php vendor/bin/phpunit tests/Controller/RateControllerTest.php
+docker compose exec php vendor/bin/phpunit tests/Security/SignatureBuilderTest.php
+```
+
+### 4. Запуск одного метода (по имени)
+
+```bash
+docker compose exec php vendor/bin/phpunit --filter testListReturnsActiveRates
+docker compose exec php vendor/bin/phpunit tests/Controller/RateControllerTest.php --filter testGetOneReturns404
+```
+
+### 5. Полезные флаги
+
+```bash
+# human-readable вывод (testdox)
+docker compose exec php vendor/bin/phpunit --testdox
+
+# остановиться на первой ошибке
+docker compose exec php vendor/bin/phpunit --stop-on-failure
+
+# указать конфигурацию явно (например, в CI)
+docker compose exec php vendor/bin/phpunit -c phpunit.dist.xml
+```
+
+## API
+
+Все эндпоинты API (кроме `/api/doc*`) требуют авторизацию по двум заголовкам:
+
+| Заголовок | Описание |
+|---|---|
+| `X-API-Key` | Публичный идентификатор мерчанта (`apiKey`). |
+| `X-API-Signature` | `hex(HMAC-SHA512)` от канонической строки запроса, ключ — `apiSecret` мерчанта. |
+
+Базовый URL: `http://localhost:8080/api/v1`.
+
+### Эндпоинты
+
+| Метод | Путь | Описание |
+|---|---|---|
+| `GET` | `/api/v1/rates` | Список всех активных курсов (без дублей по провайдеру). |
+| `GET` | `/api/v1/rates/{currency}` | Активный курс пары `merchant.baseCurrency → currency`. Регистр валюты не важен. |
+
+Коды ответов:
+- `200` — успех (тело — массив или объект `RateResponse`).
+- `401` — `{"error":"unauthorized","message":"..."}` (нет/неверный ключ или подпись, мерчант неактивен).
+- `404` — `{"error":"not_found","message":"..."}` (нет активного курса для пары).
+
+### Swagger UI / OpenAPI
+
+- UI: `http://localhost:8080/api/doc`
+- JSON-схема: `http://localhost:8080/api/doc.json`
+
+Документация сгенерирована через `nelmio/api-doc-bundle` и автоматически отражает контроллеры, атрибуты OpenAPI и DTO.
+
+### Формирование подписи (X-API-Signature)
+
+Каноническая строка собирается по шаблону:
+
+```
+METHOD\nPATH\nCANONICAL_QUERY\nSHA256_HEX(BODY)
+```
+
+Где:
+- `METHOD` — HTTP-метод в верхнем регистре (`GET`, `POST`, ...).
+- `PATH` — `$request->getPathInfo()` (например, `/api/v1/rates/EUR`).
+- `CANONICAL_QUERY` — query-параметры, отсортированные по ключу, значения URL-кодируются через `rawurlencode`, объединяются через `&`. Пустая строка, если query нет.
+- `SHA256_HEX(BODY)` — `hash('sha256', $rawBody)`; для пустого тела это константа `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Финальная подпись:
+
+```
+X-API-Signature = hash_hmac('sha512', canonical_string, apiSecret)  // hex, lowercase
+```
+
+#### Пример: `GET /api/v1/rates/EUR` для мерчанта Acme Payments
+
+Bash + openssl:
+```bash
+SECRET='sk_acme_dev_secret_8a1b6f2c4e9d3a7b'   # apiSecret мерчанта
+API_KEY='mk_acme_dev_key_0001'                 # apiKey мерчанта
+METHOD='GET'
+PATH_='/api/v1/rates/EUR'                      # без query, без тела
+QUERY=''
+BODY=''
+
+# sha256 от пустого тела
+BODY_HASH=$(printf '%s' "$BODY" | openssl dgst -sha256 -hex | awk '{print $NF}')
+
+# каноническая строка (4 строки, разделены \n)
+CANONICAL=$(printf '%s\n%s\n%s\n%s' "$METHOD" "$PATH_" "$QUERY" "$BODY_HASH")
+
+# HMAC-SHA512 → hex (lowercase)
+SIGNATURE=$(printf '%s' "$CANONICAL" | openssl dgst -sha512 -hmac "$SECRET" -hex | awk '{print $NF}')
+
+curl -i "http://localhost:8080${PATH_}" \
+  -H "X-API-Key: $API_KEY" \
+  -H "X-API-Signature: $SIGNATURE"
+```
+
+PHP:
+```php
+$method   = 'GET';
+$path     = '/api/v1/rates/EUR';
+$query    = '';                  // или ksort($params) + rawurlencode
+$body     = '';
+$bodyHash = hash('sha256', $body);
+$canonical = "$method\n$path\n$query\n$bodyHash";
+$signature = hash_hmac('sha512', $canonical, $apiSecret);
+```
+
+Python:
+```python
+import hashlib, hmac, requests
+
+secret  = "sk_acme_dev_secret_8a1b6f2c4e9d3a7b"
+api_key = "mk_acme_dev_key_0001"
+method  = "GET"
+path    = "/api/v1/rates/EUR"
+query   = ""
+body    = ""
+
+body_hash = hashlib.sha256(body.encode()).hexdigest()
+canonical = "\n".join([method, path, query, body_hash])
+signature = hmac.new(secret.encode(), canonical.encode(), hashlib.sha512).hexdigest()
+
+r = requests.get(
+    f"http://localhost:8080{path}",
+    headers={"X-API-Key": api_key, "X-API-Signature": signature},
+)
+```
+
+#### Пример с query-параметрами: `GET /api/v1/rates?provider=binance&pair=BTC%2FUSDT`
+
+```bash
+SECRET='sk_acme_dev_secret_8a1b6f2c4e9d3a7b'
+API_KEY='mk_acme_dev_key_0001'
+METHOD='GET'
+PATH_='/api/v1/rates'
+QUERY_RAW='pair=BTC%2FUSDT&provider=binance'   # порядок не важен — на стороне сервера сортируется
+
+BODY_HASH=$(printf '' | openssl dgst -sha256 -hex | awk '{print $NF}')
+CANONICAL=$(printf '%s\n%s\n%s\n%s' "$METHOD" "$PATH_" "$QUERY_RAW" "$BODY_HASH")
+SIGNATURE=$(printf '%s' "$CANONICAL" | openssl dgst -sha512 -hmac "$SECRET" -hex | awk '{print $NF}')
+
+curl -i "http://localhost:8080${PATH_}?${QUERY_RAW}" \
+  -H "X-API-Key: $API_KEY" \
+  -H "X-API-Signature: $SIGNATURE"
+```
+
+> ⚠️ `CANONICAL_QUERY` строится на стороне сервера из сырого query-string запроса: значения декодируются через `parse_str`, затем сортируются по ключу и повторно URL-кодируются через `rawurlencode`. Поэтому в подписи порядок параметров и формат кодирования не критичны — главное, чтобы значения совпадали.
 
 **Создать нового мерчанта (генерация apiKey + apiSecret)**
 ```bash

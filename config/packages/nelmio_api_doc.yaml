@@ -1,0 +1,30 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: Rates API
+            version: 1.0.0
+            description: API для получения активных курсов валют по провайдерам.
+        components:
+            securitySchemes:
+                ApiKey:
+                    type: apiKey
+                    in: header
+                    name: X-API-Key
+                    description: API-ключ мерчанта (`apiKey`).
+                ApiSignature:
+                    type: apiKey
+                    in: header
+                    name: X-API-Signature
+                    description: HMAC-SHA512 (hex, lowercase) от канонической строки запроса.
+        security:
+            - ApiKey: []
+              ApiSignature: []
+    areas:
+        default:
+            path_patterns:
+                - ^/api(?!/doc)
+    models:
+        names:
+            -
+                alias: RateResponse
+                type: App\Dto\RateResponse
