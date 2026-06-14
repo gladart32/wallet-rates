@@ -21,11 +21,13 @@ docker compose exec php bin/console doctrine:migrations:migrate -n
 ## Полезные команды
 
 **Проверить состояние сервисов**
+
 ```bash
 docker compose ps
 ```
 
 **Логи (все / конкретный сервис)**
+
 ```bash
 docker compose logs -f
 ```
@@ -43,26 +45,31 @@ docker compose logs -f mysql
 ```
 
 **Зайти в контейнер PHP**
+
 ```bash
 docker compose exec php bash
 ```
 
 **Очистить кэш Symfony**
+
 ```bash
 docker compose exec php bin/console cache:clear
 ```
 
 **Запустить миграции**
+
 ```bash
 docker compose exec php bin/console doctrine:migrations:migrate -n
 ```
 
 **Запустить тесты**
+
 ```bash
 docker compose exec php vendor/bin/phpunit
 ```
 
 **Установить/обновить зависимости**
+
 ```bash
 docker compose exec php composer install
 ```
@@ -72,6 +79,7 @@ docker compose exec php composer update
 ```
 
 **Остановить и убрать контейнеры** (с вольюмом — удалит данные MySQL)
+
 ```bash
 docker compose down
 ```
@@ -86,7 +94,7 @@ docker compose down -v
 |---|---|---|
 | nginx | 8080→80 | Web-сервер |
 | php | — | PHP-FPM (внутренний) |
-| mysql | 3306→3306 | БД (`symfony` / `symfony` / `symfony`) |
+| mysql | 3306→3306 | БД (`wallet-rates` / `user` / `123456`) |
 | redis | 6379→6379 | Кэш/мессенджер |
 
 ## Переменные окружения
