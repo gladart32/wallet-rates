@@ -14,6 +14,13 @@
 docker compose up -d --build
 docker compose exec php composer install
 docker compose exec php bin/console doctrine:migrations:migrate -n
+docker compose exec php bin/console doctrine:fixtures:load -n
+```
+
+Либо миграции и сидинг одной командой (после `composer install`):
+
+```bash
+docker compose exec php composer db:setup
 ```
 
 Приложение будет доступно на [http://localhost:8080](http://localhost:8080).
@@ -57,10 +64,25 @@ docker compose exec php bin/console cache:clear
 ```
 
 **Запустить миграции**
-
 ```bash
 docker compose exec php bin/console doctrine:migrations:migrate -n
 ```
+
+**Заполнить БД тестовыми данными (фикстуры)**
+```bash
+docker compose exec php bin/console doctrine:fixtures:load -n
+```
+> ⚠️ Команда **очищает таблицы** (`merchant`, `provider`, `rate`) и вставляет тестовые данные заново. Запускать только в dev-окружении.
+>
+> Что загружается:
+> - 3 мерчанта: `Acme Payments` (USD), `EuroGateway` (EUR), `LegacyLtd` (GBP, disabled)
+> - 5 провайдеров: `binance`, `coinbase`, `kraken`, `bybit` (active), `okx` (disabled)
+> - 100 курсов: 25 валютных пар × 4 активных провайдера, с реалистичным разбросом ±2%
+>
+> Чтобы добавить новые данные, не удаляя существующие:
+> ```bash
+> docker compose exec php bin/console doctrine:fixtures:load -n --append
+> ```
 
 **Запустить тесты**
 

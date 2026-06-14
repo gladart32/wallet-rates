@@ -68,6 +68,10 @@
         ],
         "post-update-cmd": [
             "@auto-scripts"
+        ],
+        "db:setup": [
+            "bin/console doctrine:migrations:migrate -n",
+            "bin/console doctrine:fixtures:load -n"
         ]
     },
     "conflict": {
@@ -80,6 +84,7 @@
         }
     },
     "require-dev": {
+        "doctrine/doctrine-fixtures-bundle": "^4.0",
         "phpunit/phpunit": "^13.2",
         "symfony/maker-bundle": "^1.0"
     }

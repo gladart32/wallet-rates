@@ -19,7 +19,8 @@ RUN docker-php-ext-configure intl
 RUN docker-php-ext-install -j$(nproc) \
     pdo_mysql \
     intl \
-    zip
+    zip \
+    bcmath
 
 # Redis
 RUN pecl install redis \
