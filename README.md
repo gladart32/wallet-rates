@@ -85,10 +85,26 @@ docker compose exec php bin/console doctrine:fixtures:load -n
 > ```
 
 **Запустить тесты**
-
 ```bash
 docker compose exec php vendor/bin/phpunit
 ```
+
+**Создать нового мерчанта (генерация apiKey + apiSecret)**
+```bash
+# Через аргументы
+docker compose exec php bin/console app:merchant:create "Acme Payments" USD
+
+# Интерактивно (спросит имя и базовую валюту, по умолчанию USD)
+docker compose exec php bin/console app:merchant:create
+
+# Справка по аргументам
+docker compose exec php bin/console help app:merchant:create
+```
+> Команда генерирует:
+> - `apiKey` — `mk_` + 32 hex-символа
+> - `apiSecret` — 64 hex-символа (32 случайных байта), готов для `hash_hmac('sha512', $payload, $secret)`
+>
+> **API secret показывается только один раз** при создании — сохраните его сразу. Валидация: `name` ≤ 128 символов, `baseCurrency` ≤ 16 символов (нормализуется в uppercase).
 
 **Установить/обновить зависимости**
 
